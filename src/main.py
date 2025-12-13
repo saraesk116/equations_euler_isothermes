@@ -18,11 +18,12 @@ from ascii import *
 import alert
 import matplotlib.pyplot as plt
 import pandas as pd
+from tqdm import tqdm
 # autopep8: on
 
 #%%
 #------------------------------------------------------ Settings
-nite = 5000 # Number of time iterations
+nite = 500 # Number of time iterations
 CFL = 0.5  # CFL number
 mesh_path = curr_dir + "/../mesh/naca0012.msh"  # Path to gmsh mesh file
 nfigures = 0  # Number of figures desired
@@ -88,7 +89,11 @@ diff_history = []
 #------------------------------------------------------ Run simulation
 # Loop over time
 #alert.incomplete("src/main.py:loop_over_time")
-for t in range(nite): 
+# get current time
+from datetime import datetime
+start_time = datetime.now()
+
+for t in tqdm(range(nite), desc="Time iteration"): 
     q_old = q.copy()  # Save old solution (for residual computation)
     solve_one_time_step(mesh, q, flux, dt, params)
     diff = q - q_old
@@ -101,7 +106,9 @@ for t in range(nite):
     diff_rhov = np.linalg.norm(diff[:, 2], ord=2)
     diff_history.append((diff_rho, diff_rhou, diff_rhov))
 
-
+end_time = datetime.now()
+elapsed_time = end_time - start_time
+print("Elapsed time during the simulation: {}".format(elapsed_time))
 #------------------------------------------------------ Post-process
 # Recall simulation setup
 print("----------------------")
@@ -126,7 +133,7 @@ surf2ascii(curr_dir + "/../surf.csv", mesh, ["WALL"], q[:, 0], header="x,y,rho")
 #  CHARGEMENT ET PRÉPARATION DES DONNÉES 
 # Lecture du fichier CSV
 try:
-    df = pd.read_csv('surf.csv')
+    df = pd.read_csv('../surf.csv')
     # Nettoyage des noms de colonnes (enlève les espaces éventuels)
     df.columns = df.columns.str.strip()
 except FileNotFoundError:
