@@ -49,8 +49,10 @@ def compute_time_step(mesh, q, dt, a, CFL, local):
                 min_edge = mesh.face_area(edge)
 
         dt[icell] = min_edge/vitesse_cell
-    
-    dt[:] = np.min(dt)*CFL
+    if local : 
+        dt[:] = dt[:]*CFL
+    else : 
+        dt[:] = np.min(dt)*CFL
     #alert.incomplete("solver.py:compute_time_step")
 
 
