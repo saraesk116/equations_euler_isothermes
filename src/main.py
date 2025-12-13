@@ -22,7 +22,7 @@ from tqdm import tqdm
 # autopep8: on
 
 #%%------------------------------------------------------ Settings
-nite = 500 # Number of time iterations
+nite = 2000 # Number of time iterations
 CFL = 0.5  # CFL number
 mesh_path = curr_dir + "/../mesh/naca0012.msh"  # Path to gmsh mesh file
 nfigures = 0  # Number of figures desired
@@ -108,6 +108,62 @@ for t in tqdm(range(nite), desc="Time iteration"):
 end_time = datetime.now()
 elapsed_time = end_time - start_time
 print("Elapsed time during the simulation: {}".format(elapsed_time))
+
+# Save results with timestamp and parameters
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+local_str = "local_True" if localTimeStep else "local_False"
+results_dir = curr_dir + f"/../results/{timestamp}_CFL_{CFL}_nite_{nite}_{local_str}_alpha_{alpha}_Minf_{Minf}"
+os.makedirs(results_dir, exist_ok=True)
+
+# Save residuals and differences in npz format
+np.savez(
+    results_dir + "/convergence_data.npz",
+    residus_history=np.array(residus_history),
+    diff_history=np.array(diff_history),
+    nite=nite,
+    CFL=CFL,
+    localTimeStep=localTimeStep,
+    Minf=Minf,
+    alpha=alpha,
+    elapsed_time_seconds=elapsed_time.total_seconds()
+)
+
+# Save simulation setup to text file
+with open(results_dir + "/simulation_setup.txt", "w") as f:
+    f.write("=" * 50 + "\n")
+    f.write("SIMULATION SETUP\n")
+    f.write("=" * 50 + "\n")
+    f.write(f"Timestamp: {timestamp}\n")
+    f.write(f"Elapsed time: {elapsed_time}\n")
+    f.write("\n--- Physical Parameters ---\n")
+    f.write(f"Pinf = {Pinf:.3e} Pa\n")
+    f.write(f"Tinf = {Tinf:.3e} K\n")
+    f.write(f"Minf = {Minf:.3e}\n")
+    f.write(f"alpha = {alpha} deg\n")
+    f.write(f"rhoInf = {rhoInf:.3e} kg/m³\n")
+    f.write(f"rhouInf = {rhouInf:.3e} kg/(m²·s)\n")
+    f.write(f"rhovInf = {rhovInf:.3e} kg/(m²·s)\n")
+    f.write(f"gamma = {gamma:.3e}\n")
+    f.write(f"r = {r:.3e} J/(kg·K)\n")
+    f.write(f"a = {a:.3e}\n")
+    f.write(f"c = {c:.3e} m/s\n")
+    f.write("\n--- Numerical Parameters ---\n")
+    f.write(f"nite = {nite}\n")
+    f.write(f"CFL = {CFL:.2e}\n")
+    f.write(f"Local time step = {localTimeStep}\n")
+    f.write(f"Spatial dimension = {spaDim}\n")
+    f.write("\n--- Mesh Information ---\n")
+    f.write(f"Mesh file: {mesh_path}\n")
+    f.write(f"Number of cells = {mesh.ncells()}\n")
+    f.write(f"Number of nodes = {mesh.nnodes()}\n")
+    f.write(f"Number of faces = {mesh.nfaces()}\n")
+    f.write("=" * 50 + "\n")
+
+# Output solution to file in results directory
+surf2ascii(results_dir + "/surf.csv", mesh, ["WALL"], q[:, 0], header="x,y,rho")
+
+print(f"Results saved in: {results_dir}")
+
 #%%------------------------------------------------------ Post-process
 # Recall simulation setup
 print("----------------------")
@@ -124,7 +180,7 @@ print("a = {:.3e}".format(a))
 print("Number of cells = {:d}".format(mesh.ncells()))
 print("Local time step ? " + str(localTimeStep))
 
-# Output solution to file
+# Keep backward compatibility - also save to root directory
 surf2ascii(curr_dir + "/../surf.csv", mesh, ["WALL"], q[:, 0], header="x,y,rho")
 
 
