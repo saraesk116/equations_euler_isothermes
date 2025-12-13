@@ -21,8 +21,7 @@ import pandas as pd
 from tqdm import tqdm
 # autopep8: on
 
-#%%
-#------------------------------------------------------ Settings
+#%%------------------------------------------------------ Settings
 nite = 500 # Number of time iterations
 CFL = 0.5  # CFL number
 mesh_path = curr_dir + "/../mesh/naca0012.msh"  # Path to gmsh mesh file
@@ -48,7 +47,7 @@ spaDim = 2  # Number of spatial dimensions
 gamma = 1.4  # Specific heat ratio (usually 1.4)
 r = 287  # Perfect gas constant
 
-#------------------------------------------------------ Prepare to run
+#%%------------------------------------------------------ Prepare to run
 # Process parameters
 c = sqrt(gamma * r * Tinf)  # sound velocity
 a = c / sqrt(gamma)
@@ -86,7 +85,7 @@ dt = np.zeros(mesh.ncells())  # Time step in each cell (will evolve with CFL cri
 
 residus_history = [] 
 diff_history = []
-#------------------------------------------------------ Run simulation
+#%%----------------------------------------------------- Run simulation
 # Loop over time
 #alert.incomplete("src/main.py:loop_over_time")
 # get current time
@@ -109,7 +108,7 @@ for t in tqdm(range(nite), desc="Time iteration"):
 end_time = datetime.now()
 elapsed_time = end_time - start_time
 print("Elapsed time during the simulation: {}".format(elapsed_time))
-#------------------------------------------------------ Post-process
+#%%------------------------------------------------------ Post-process
 # Recall simulation setup
 print("----------------------")
 print("Simulation parameters:")
@@ -241,4 +240,146 @@ plt.legend()
 plt.grid()
 plt.show()
 
+np.savetxt(curr_dir + "/../residus_history.csv", residus_history, delimiter=",", header="residu_rho,residu_rhou,residu_rhov", comments='')
+np.savetxt(curr_dir + "/../diff_history.csv", diff_history, delimiter=",", header="diff_rho,diff_rhou,diff_rhov", comments='')
 
+
+#%%Compute lift and drag
+
+nite = 3000  # Number of time iterations
+angles_incidence = np.linspace(-5, 15, 5)  # angles d'incidence en degrés
+Cl_values = []
+Cd_values = []
+
+# On suppose une corde unitaire si non spécifiée
+chord = 1.0 
+
+# Dictionnaire pour stocker l'historique des résidus par angle
+residuals_by_alpha = {}
+
+for alpha in angles_incidence:
+
+    # -- SETUP SIMULATION WITH NEW ALPHA --
+    radian_alpha = alpha * pi / 180
+    rhouInf = rhoInf * Minf * c * cos(radian_alpha)
+    rhovInf = rhoInf * Minf * c * sin(radian_alpha)
+
+    # Re-initialize solution
+    q[:, 0] = rhoInf
+    q[:, 1] = rhouInf
+    q[:, 2] = rhovInf
+
+    # Update params
+    params["rhouInf"] = rhouInf
+    params["rhovInf"] = rhovInf
+
+    current_residuals = [] # To store residuals for current alpha
+
+    # -- RUN SIMULATION --
+    for t in tqdm(range(nite), desc=f"Angle d'incidence {alpha}°"):
+        q_old = q.copy()
+        solve_one_time_step(mesh, q, flux, dt, params)
+
+        # Compute residuals 
+        diff = q - q_old
+        # small epsilon to avoid division by zero
+        norm_q = np.linalg.norm(q_old[:, 0])
+        if norm_q < 1e-12: norm_q = 1.0
+            
+        residu_rho = np.linalg.norm(diff[:, 0]) / norm_q
+        current_residuals.append(residu_rho)
+
+    # Store residuals for this angle
+    residuals_by_alpha[alpha] = current_residuals
+    
+    # -- POST-PROCESS TO COMPUTE Cl AND Cd --
+    Fx = 0.0
+    Fy = 0.0
+
+    # Pression dynamique infinie pour normalisation (0.5 * rho * V^2)
+    q_dyn_inf = 0.5 * rhoInf * (Minf * c)**2
+
+    for bnd_name, face_ids in mesh.bnd2f.items():
+        if bnd_name == "WALL":
+            for face_id in face_ids:
+                # CORRECTION : Accès direct au tableau f2c avec l'indice de la face
+                # f2c est (nfaces, 2). Pour une frontière, col 0 = cellule interne.
+                cell_id = mesh.f2c[face_id, 0]
+                rho = q[cell_id, 0]
+                
+                # Calcul Pression (Euler Isotherme : P = rho * a^2)
+                P = rho * params["a"]**2
+                
+                # Coefficient de pression
+                Cp = (P - Pinf) / q_dyn_inf
+                
+                # Récupération de la géométrie via les méthodes de la classe Mesh
+                normal = mesh.face_normal(face_id)
+                nx = normal[0]
+                ny = normal[1]
+                L = mesh.face_area(face_id)
+                
+                Fx += Cp * nx * L
+                Fy += Cp * ny * L
+    
+    # Coefficients dans le repère du corps (Cx, Cy)
+    Cx = Fx / chord
+    Cy = Fy / chord
+    
+    # Projection dans le repère vent (Lift, Drag)
+    cl_actuel = -Cx * sin(radian_alpha) + Cy * cos(radian_alpha) # Portance
+    cd_actuel = Cx * cos(radian_alpha) + Cy * sin(radian_alpha) # Trainée
+    
+    Cl_values.append(cl_actuel)
+    Cd_values.append(cd_actuel)
+    print(f"  -> Cl = {cl_actuel:.4f}, Cd = {cd_actuel:.4f}, Résidu final = {current_residuals[-1]:.2e}")
+
+#%% Plot residuals vs iterations for each alpha
+
+dir_plot = curr_dir + "/../plots_incidence/"
+if not os.path.exists(dir_plot):
+    os.makedirs(dir_plot)
+
+
+# Save residuals history for each alpha in npz (convert numeric keys to strings)
+residuals_str_keys = {f"alpha_{alpha}": res for alpha, res in residuals_by_alpha.items()}
+np.savez(dir_plot + "residuals_by_alpha.npz", **residuals_str_keys)
+
+# save Cl and Cd values
+np.savez(dir_plot + "Cl_Cd_values.npz", angles_incidence=angles_incidence, Cl_values=Cl_values, Cd_values=Cd_values)
+
+# Tracé de la convergence pour chaque angle
+plt.figure(figsize=(8,6))
+for alpha, res in residuals_by_alpha.items():
+    plt.semilogy(res, label=f'Alpha = {alpha}°')
+
+plt.xlabel('Itération')
+plt.ylabel('Résidu (rho)')
+plt.title('Convergence pour différents angles d\'incidence')
+plt.legend()
+plt.grid()
+plt.savefig(dir_plot + "convergence_incidence.png")
+# save figure in npz
+plt.show()
+
+# Plot Cl and Cd vs alpha
+plt.figure(figsize=(8,6))
+plt.plot(angles_incidence, Cl_values, '-o', label='Cl')
+plt.xlabel('Incidence (deg)')
+plt.ylabel('Coefficient de Portance (Cl)')
+plt.title('Polaire de portance')
+plt.grid()
+plt.legend()
+plt.savefig(dir_plot + "polaire_portance.png")
+plt.show()
+
+plt.figure(figsize=(8,6))
+plt.plot(angles_incidence, Cd_values, '-o', label='Cd')
+plt.xlabel('Incidence (deg)')
+plt.ylabel('Coefficient de Trainée (Cd)')
+plt.title('Polaire de trainée')
+plt.grid()
+plt.legend()
+plt.savefig(dir_plot + "polaire_trainée.png")
+plt.show()
+# %%
