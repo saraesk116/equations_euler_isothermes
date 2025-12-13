@@ -22,7 +22,7 @@ from tqdm import tqdm
 # autopep8: on
 
 #%%------------------------------------------------------ Settings
-nite = 2000 # Number of time iterations
+nite = 200 # Number of time iterations
 CFL = 0.2  # CFL number
 mesh_path = curr_dir + "/../mesh/naca0012.msh"  # Path to gmsh mesh file
 nfigures = 0  # Number of figures desired
@@ -169,12 +169,12 @@ variables = (
     (q[:, 0], "CellData", "rho"),
     (q[:, 1:], "CellData", "rhoU"),
 )
-write2vtk(curr_dir + "/../results/result.vtu", mesh.coords, conn, offset, types, variables)
+write2vtk(results_dir + "/result.vtu", mesh.coords, conn, offset, types, variables)
 
 
 print(f"Results saved in: {results_dir}")
 
-#%%------------------------------------------------------ Post-process
+#------------------------------------------------------ Post-process
 # Recall simulation setup
 print("----------------------")
 print("Simulation parameters:")
@@ -189,125 +189,6 @@ print("gamma = {:.3e}".format(gamma))
 print("a = {:.3e}".format(a))
 print("Number of cells = {:d}".format(mesh.ncells()))
 print("Local time step ? " + str(localTimeStep))
-
-# Keep backward compatibility - also save to root directory
-surf2ascii(curr_dir + "/../surf.csv", mesh, ["WALL"], q[:, 0], header="x,y,rho")
-
-
-# Calcul de la pression P et du Coefficient de Pression (Cp)
-#  CHARGEMENT ET PRÉPARATION DES DONNÉES 
-# Lecture du fichier CSV
-try:
-    df = pd.read_csv('../surf.csv')
-    # Nettoyage des noms de colonnes (enlève les espaces éventuels)
-    df.columns = df.columns.str.strip()
-except FileNotFoundError:
-    print("Erreur : Le fichier 'surf.csv' est introuvable.")
-    exit()
-
-# Calcul de la pression P et du Coefficient de Pression (Cp)
-# Cp = (P - P_inf) / q_inf
-df['p'] = df['rho'] * (a**2) 
-# Vitesse totale (magnitude)
-v_inf = Minf * c 
-
-# Dénominateur (Pression dynamique)
-q_inf = 0.5 * rhoInf * (v_inf**2)
-
-df['Cp'] = (df['p'] - Pinf) / q_inf
-
-# SÉPARATION INTRADOS / EXTRADOS
-# Hypothèse : Le profil est aligné sur l'axe X.
-# Extrados (Upper) : y >= 0
-# Intrados (Lower) : y < 0
-# On trie par 'x' pour avoir un tracé de ligne propre.
-
-extrados = df[df['y'] >= 0].sort_values(by='x')  
-intrados = df[df['y'] < 0].sort_values(by='x')
-
-
-
-# Export to vtk
-conn, offset = mesh.flatten_connectivity()
-types = [nnodes2vtkType(len(inodes)) for inodes in mesh.c2n]
-variables = (
-    (q[:, 0], "CellData", "rho"),
-    (q[:, 1:], "CellData", "rhoU"),
-)
-write2vtk(curr_dir + "/../result.vtu", mesh.coords, conn, offset, types, variables)
-
-
-#%%
-# plot pression et Cp figures
-
-
-# === FIGURE 1 : Pression Intrados et Extrados ===
-plt.figure(figsize=(10, 6))
-plt.plot(intrados['x'], intrados['p'], 'r-', linewidth=2, label='Intrados (y < 0)')
-plt.plot(extrados['x'], extrados['p'], 'b-', linewidth=2, label='Extrados (y >= 0)')
-plt.title("Distribution de la Pression (Intrados et Extrados)")
-plt.xlabel("Position x")
-plt.ylabel("Pression P")
-plt.grid(True)
-plt.legend()
-plt.show()
-
-# === FIGURE 2 : Coefficient de Pression Cp en fonction de x ===
-plt.figure(figsize=(10, 6))
-
-# 1. Tracer l'Extrados (souvent en bleu ou noir)
-# C'est la face supérieure qui porte l'avion (généralement Cp négatif)
-plt.plot(extrados['x'], extrados['Cp'], 'b-', linewidth=1.5, label='Extrados (Upper)')
-
-# 2. Tracer l'Intrados (souvent en rouge)
-# C'est la face inférieure (généralement Cp positif ou proche de 0)
-plt.plot(intrados['x'], intrados['Cp'], 'r-', linewidth=1.5, label='Intrados (Lower)')
-
-# 3. INVERSER L'AXE Y (Convention Aérodynamique) !!
-# Le "vide" (succion) tire l'aile vers le haut, donc on met le -Cp en haut.
-plt.gca().invert_yaxis()
-
-# 4. Mise en forme
-plt.title(f"Coefficient de Pression $C_p$ autour du profil\n(Mach = {Minf}, Alpha = {alpha}°)")
-plt.xlabel("Position x (m)")
-plt.ylabel("$C_p$ (Axe inversé)")
-plt.axhline(0, color='black', linewidth=0.8, linestyle='--') # Ligne de référence Cp=0
-plt.grid(True, which='both', linestyle='--', alpha=0.7)
-plt.legend()
-
-plt.show()
-
-
-
-# plot diff history
-diff_history = np.array(diff_history)
-plt.figure()
-plt.semilogy(diff_history[:,0], label='Diff rho')
-plt.semilogy(diff_history[:,1], label='Diff rhou')
-plt.semilogy(diff_history[:,2], label='Diff rhov')
-plt.xlabel('Iteration')
-plt.ylabel('Norme L2 de la différence entre 2 pas de temps successifs')
-plt.title('Différence entre 2 pas de temps successifs')
-plt.legend()
-plt.grid()
-plt.show()
-
-
-#plot residuals
-residus_history = np.array(residus_history)
-plt.figure()
-plt.semilogy(residus_history[:,0], label='Residu rho')
-plt.semilogy(residus_history[:,1], label='Residu rhou')
-plt.semilogy(residus_history[:,2], label='Residu rhov')
-plt.xlabel('Iteration')
-plt.ylabel('Résidu (norme L2)')
-plt.title('Convergence de la simulation CFD')
-plt.legend()
-plt.grid()
-plt.show()
-
-np.savetxt(curr_dir + "/../residus_history.csv", residus_history, delimiter=",", header="residu_rho,residu_rhou,residu_rhov", comments='')
-np.savetxt(curr_dir + "/../diff_history.csv", diff_history, delimiter=",", header="diff_rho,diff_rhou,diff_rhov", comments='')
 
 
 #%%Compute lift and drag

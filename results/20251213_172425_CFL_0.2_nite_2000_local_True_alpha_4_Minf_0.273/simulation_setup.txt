@@ -1,0 +1,31 @@
+==================================================
+SIMULATION SETUP
+==================================================
+Timestamp: 20251213_172425
+Elapsed time: 0:03:02.628099
+
+--- Physical Parameters ---
+Pinf = 1.013e+05 Pa
+Tinf = 2.683e+02 K
+Minf = 2.730e-01
+alpha = 4 deg
+rhoInf = 1.316e+00 kg/m³
+rhouInf = 1.177e+02 kg/(m²·s)
+rhovInf = 8.228e+00 kg/(m²·s)
+gamma = 1.400e+00
+r = 2.870e+02 J/(kg·K)
+a = 2.775e+02
+c = 3.283e+02 m/s
+
+--- Numerical Parameters ---
+nite = 2000
+CFL = 2.00e-01
+Local time step = True
+Spatial dimension = 2
+
+--- Mesh Information ---
+Mesh file: /Users/dorianhgn/-quations_euler_isothermes/src/../mesh/naca0012.msh
+Number of cells = 2697
+Number of nodes = 1431
+Number of faces = 4128
+==================================================
