@@ -23,7 +23,7 @@ from tqdm import tqdm
 
 #%%------------------------------------------------------ Settings
 nite = 2000 # Number of time iterations
-CFL = 0.5  # CFL number
+CFL = 0.2  # CFL number
 mesh_path = curr_dir + "/../mesh/naca0012.msh"  # Path to gmsh mesh file
 nfigures = 0  # Number of figures desired
 localTimeStep = False  # Local time step or global time step (=same for all cells)
@@ -161,6 +161,16 @@ with open(results_dir + "/simulation_setup.txt", "w") as f:
 
 # Output solution to file in results directory
 surf2ascii(results_dir + "/surf.csv", mesh, ["WALL"], q[:, 0], header="x,y,rho")
+
+# Export to vtk
+conn, offset = mesh.flatten_connectivity()
+types = [nnodes2vtkType(len(inodes)) for inodes in mesh.c2n]
+variables = (
+    (q[:, 0], "CellData", "rho"),
+    (q[:, 1:], "CellData", "rhoU"),
+)
+write2vtk(curr_dir + "/../results/result.vtu", mesh.coords, conn, offset, types, variables)
+
 
 print(f"Results saved in: {results_dir}")
 
