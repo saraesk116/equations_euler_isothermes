@@ -1,0 +1,19 @@
+Angle d'incidence -2.0°, residu 9.98e-05:  16%|█▌        | 160/1000 [00:15<01:18, 10.66it/s]
+  -> Cl = -0.1895, Cd = 0.0919, Résidu final = 9.98e-05
+Angle d'incidence 1.5°, residu 9.96e-05:  16%|█▌        | 160/1000 [00:15<01:19, 10.56it/s]
+  -> Cl = 0.1399, Cd = 0.0888, Résidu final = 9.96e-05
+Angle d'incidence 5.0°, residu 9.97e-05:  18%|█▊        | 177/1000 [00:16<01:18, 10.51it/s]
+  -> Cl = 0.4590, Cd = 0.1189, Résidu final = 9.97e-05
+Angle d'incidence 8.5°, residu 9.98e-05:  21%|██        | 209/1000 [00:19<01:15, 10.48it/s]
+  -> Cl = 0.7478, Cd = 0.1790, Résidu final = 9.98e-05
+Angle d'incidence 12.0°, residu 9.98e-05:  25%|██▍       | 246/1000 [00:23<01:11, 10.56it/s]
+  -> Cl = 1.0016, Cd = 0.2665, Résidu final = 9.98e-05
+Angle d'incidence 13.0°, residu 9.98e-05:  26%|██▌       | 258/1000 [00:24<01:10, 10.56it/s]
+  -> Cl = 1.0668, Cd = 0.2955, Résidu final = 9.98e-05
+Angle d'incidence 14.25°, residu 9.98e-05:  27%|██▋       | 273/1000 [00:25<01:08, 10.60it/s]
+  -> Cl = 1.1448, Cd = 0.3341, Résidu final = 9.98e-05
+Angle d'incidence 15.5°, residu 9.99e-05:  29%|██▉       | 288/1000 [00:27<01:07, 10.57it/s]
+  -> Cl = 1.2194, Cd = 0.3756, Résidu final = 9.99e-05
+Angle d'incidence 16.75°, residu 9.98e-05:  31%|███       | 306/1000 [00:28<01:05, 10.65it/s]
+  -> Cl = 1.2867, Cd = 0.4180, Résidu final = 9.98e-05
+Angle d'incidence 18.0°, residu 9.98e-05:  33%|███▎      | 327/1000 [00:30<01:03, 10.68it/s]  -> Cl = 1.3462, Cd = 0.4606, Résidu final = 9.98e-05

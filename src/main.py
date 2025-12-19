@@ -19,14 +19,16 @@ import alert
 import matplotlib.pyplot as plt
 import pandas as pd
 from tqdm import tqdm
+from datetime import datetime
+
 # autopep8: on
 
 #%%------------------------------------------------------ Settings
 nite = 200 # Number of time iterations
-CFL = 0.2  # CFL number
+CFL = 0.1  # CFL number
 mesh_path = curr_dir + "/../mesh/naca0012.msh"  # Path to gmsh mesh file
 nfigures = 0  # Number of figures desired
-localTimeStep = False  # Local time step or global time step (=same for all cells)
+localTimeStep = True  # Local time step or global time step (=same for all cells)
 
 # for "farfield" condition
 Pinf = 101325  # Pressure (Pa)
@@ -69,6 +71,12 @@ params = {
 # Read mesh
 mesh = mesh_from_msh(mesh_path, spaDim)
 
+# DEBUG ------------
+print("Boundaries found in mesh:", list(mesh.bnd2f.keys()))
+for name, faces in mesh.bnd2f.items():
+    print(f"  - {name}: {len(faces)} faces")
+# ------------------
+
 # Allocate solution: `q` is a matrix (ncell, 3).
 # Each row correspond to (rho, rhou, rhov) in a given cell
 q = np.zeros((mesh.ncells(), 3))
@@ -89,7 +97,6 @@ diff_history = []
 # Loop over time
 #alert.incomplete("src/main.py:loop_over_time")
 # get current time
-from datetime import datetime
 start_time = datetime.now()
 
 for t in tqdm(range(nite), desc="Time iteration"): 
@@ -193,8 +200,10 @@ print("Local time step ? " + str(localTimeStep))
 
 #%%Compute lift and drag
 
-nite = 3000  # Number of time iterations
-angles_incidence = np.linspace(-5, 15, 5)  # angles d'incidence en degrés
+nite = 1000  # Number of time iterations
+angles_incidence = np.linspace(-2, 12, 5) 
+angles_incidence = np.concatenate((angles_incidence, np.linspace(13, 18, 5))) # angles d'incidence en degrés
+# angles_incidence = np.array([-4, 0, 10, 15, 20, 30]) # angles d'incidence en degrés
 Cl_values = []
 Cd_values = []
 
@@ -221,9 +230,11 @@ for alpha in angles_incidence:
     params["rhovInf"] = rhovInf
 
     current_residuals = [] # To store residuals for current alpha
+    residu_rho = 1.0  # Initial large value
 
     # -- RUN SIMULATION --
-    for t in tqdm(range(nite), desc=f"Angle d'incidence {alpha}°"):
+    pbar = tqdm(range(nite), desc=f"Angle d'incidence {alpha}°, residu {residu_rho:.2e}")
+    for t in pbar:
         q_old = q.copy()
         solve_one_time_step(mesh, q, flux, dt, params)
 
@@ -235,10 +246,14 @@ for alpha in angles_incidence:
             
         residu_rho = np.linalg.norm(diff[:, 0]) / norm_q
         current_residuals.append(residu_rho)
+        pbar.set_description(f"Angle d'incidence {alpha}°, residu {residu_rho:.2e}")
+
+        if residu_rho < 5e-5:
+            break  # Converged
 
     # Store residuals for this angle
     residuals_by_alpha[alpha] = current_residuals
-    
+
     # -- POST-PROCESS TO COMPUTE Cl AND Cd --
     Fx = 0.0
     Fy = 0.0
@@ -283,9 +298,40 @@ for alpha in angles_incidence:
 
 #%% Plot residuals vs iterations for each alpha
 
-dir_plot = curr_dir + "/../plots_incidence/"
-if not os.path.exists(dir_plot):
-    os.makedirs(dir_plot)
+# Save incidence sweep outputs into a timestamped folder
+incidence_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+dir_plot = curr_dir + f"/../plots_incidence_results/{incidence_timestamp}/"
+os.makedirs(dir_plot, exist_ok=True)
+
+# Save incidence sweep setup
+with open(dir_plot + "simulation_setup.txt", "w") as f:
+    f.write("=" * 50 + "\n")
+    f.write("INCIDENCE SWEEP SETUP\n")
+    f.write("=" * 50 + "\n")
+    f.write(f"Timestamp: {incidence_timestamp}\n")
+    f.write("\n--- Physical Parameters ---\n")
+    f.write(f"Pinf = {Pinf:.3e} Pa\n")
+    f.write(f"Tinf = {Tinf:.3e} K\n")
+    f.write(f"Minf = {Minf:.3e}\n")
+    f.write(f"rhoInf = {rhoInf:.3e} kg/m³\n")
+    f.write(f"gamma = {gamma:.3e}\n")
+    f.write(f"r = {r:.3e} J/(kg·K)\n")
+    f.write(f"a = {a:.3e}\n")
+    f.write(f"c = {c:.3e} m/s\n")
+    f.write("\n--- Numerical Parameters ---\n")
+    f.write(f"nite = {nite}\n")
+    f.write(f"CFL = {CFL:.2e}\n")
+    f.write(f"Local time step = {localTimeStep}\n")
+    f.write(f"Spatial dimension = {spaDim}\n")
+    f.write("\n--- Incidence Sweep ---\n")
+    f.write(f"angles_incidence = {angles_incidence.tolist()} deg\n")
+    f.write(f"chord = {chord}\n")
+    f.write("\n--- Mesh Information ---\n")
+    f.write(f"Mesh file: {mesh_path}\n")
+    f.write(f"Number of cells = {mesh.ncells()}\n")
+    f.write(f"Number of nodes = {mesh.nnodes()}\n")
+    f.write(f"Number of faces = {mesh.nfaces()}\n")
+    f.write("=" * 50 + "\n")
 
 
 # Save residuals history for each alpha in npz (convert numeric keys to strings)
